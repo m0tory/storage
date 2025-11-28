@@ -97,7 +97,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -211,7 +213,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -320,7 +324,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -412,7 +418,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Size" then
@@ -496,7 +504,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Data" then
@@ -574,7 +584,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -651,7 +663,9 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-
+				
+				task.wait()
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -719,6 +733,7 @@ function DrawingLib.getrenderproperty(obj, key)
 	if not activeObjects[obj] then
 		return nil
 	end
+	task.wait()
 	return obj[key]
 end
 
