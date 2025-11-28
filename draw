@@ -59,7 +59,10 @@ DrawingLib.Fonts = {
 function DrawingLib.cleardrawcache()
 	for obj in pairs(activeObjects) do
 		if obj.Remove then
-			obj:Remove()
+			-- spawn the remove to avoid yielding errors
+			task.spawn(function()
+				obj:Remove()
+			end)
 		end
 		activeObjects[obj] = nil
 	end
