@@ -97,7 +97,11 @@ function DrawingLib.new(drawingType)
 		lineFrame.Parent = drawingUI
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -207,7 +211,11 @@ function DrawingLib.new(drawingType)
 		uiStroke.Parent = textLabel
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -312,7 +320,11 @@ function DrawingLib.new(drawingType)
 		uiStroke.Parent = circleFrame
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -400,7 +412,11 @@ function DrawingLib.new(drawingType)
 		uiStroke.Parent = squareFrame
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Size" then
@@ -480,7 +496,11 @@ function DrawingLib.new(drawingType)
 		imageFrame.Parent = drawingUI
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Data" then
@@ -554,7 +574,11 @@ function DrawingLib.new(drawingType)
 		_linePoints.D = DrawingLib.new("Line")
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -627,7 +651,11 @@ function DrawingLib.new(drawingType)
 		_linePoints.C = DrawingLib.new("Line")
 
 		local obj = setmetatable({}, {
-			__newindex = function(_, index, value)
+			__newindex = function(self, index, value)
+				if not activeObjects[self] then
+					return
+				end
+				
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
