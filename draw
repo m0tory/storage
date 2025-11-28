@@ -10,7 +10,7 @@ drawingUI.Parent = coreGui
 
 -- variables
 local drawingIndex = 0
-local uiStrokes = {}
+local uiStrokes = table.create(0)
 local activeObjects = {} -- ADDED
 
 local baseDrawingObj = setmetatable({
@@ -61,6 +61,7 @@ function DrawingLib.cleardrawcache()
 		if obj.Remove then
 			obj:Remove()
 		end
+		activeObjects[obj] = nil
 	end
 end
 
@@ -92,14 +93,8 @@ function DrawingLib.new(drawingType)
 		lineFrame.Size = UDim2.new()
 		lineFrame.Parent = drawingUI
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -208,14 +203,8 @@ function DrawingLib.new(drawingType)
 		textLabel.Parent = drawingUI
 		uiStroke.Parent = textLabel
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -319,14 +308,8 @@ function DrawingLib.new(drawingType)
 		uiCorner.Parent = circleFrame
 		uiStroke.Parent = circleFrame
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -413,14 +396,8 @@ function DrawingLib.new(drawingType)
 		squareFrame.Parent = drawingUI
 		uiStroke.Parent = squareFrame
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Size" then
@@ -499,14 +476,8 @@ function DrawingLib.new(drawingType)
 		imageFrame.ImageColor3 = imageObj.Color
 		imageFrame.Parent = drawingUI
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Data" then
@@ -573,20 +544,14 @@ function DrawingLib.new(drawingType)
 			Filled = false
 		} + baseDrawingObj)
 
-		local _linePoints = {}
+		local _linePoints = table.create(0)
 		_linePoints.A = DrawingLib.new("Line")
 		_linePoints.B = DrawingLib.new("Line")
 		_linePoints.C = DrawingLib.new("Line")
 		_linePoints.D = DrawingLib.new("Line")
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -653,19 +618,13 @@ function DrawingLib.new(drawingType)
 			Filled = false
 		} + baseDrawingObj)
 
-		local _linePoints = {}
+		local _linePoints = table.create(0)
 		_linePoints.A = DrawingLib.new("Line")
 		_linePoints.B = DrawingLib.new("Line")
 		_linePoints.C = DrawingLib.new("Line")
 
-		local obj = setmetatable({}, {
-			__newindex = function(self, index, value)
-				if not activeObjects[self] then
-					return
-				end
-				
-				task.wait()
-				
+		local obj = setmetatable(table.create(0), {
+			__newindex = function(_, index, value)
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -733,7 +692,6 @@ function DrawingLib.getrenderproperty(obj, key)
 	if not activeObjects[obj] then
 		return nil
 	end
-	task.wait()
 	return obj[key]
 end
 
