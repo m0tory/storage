@@ -59,12 +59,8 @@ DrawingLib.Fonts = {
 function DrawingLib.cleardrawcache()
 	for obj in pairs(activeObjects) do
 		if obj.Remove then
-			-- spawn the remove to avoid yielding errors
-			task.spawn(function()
-				obj:Remove()
-			end)
+			obj:Remove()
 		end
-		activeObjects[obj] = nil
 	end
 end
 
@@ -101,7 +97,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -215,7 +211,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then
 					return
 				end
@@ -416,7 +412,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Size" then
@@ -500,7 +496,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "Data" then
@@ -578,7 +574,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
@@ -655,7 +651,7 @@ function DrawingLib.new(drawingType)
 				if not activeObjects[self] then
 					return
 				end
-				
+
 				if index ~= "Visible" and value == nil then return end
 
 				if index == "PointA" then
