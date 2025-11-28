@@ -1,9 +1,6 @@
--- DrawingLib VM-safe drop-in replacement
-local RunService = game:GetService("RunService")
-local coreGui = game:GetService("CoreGui")
-local camera = workspace.CurrentCamera
+local coreGui = game.CoreGui
 
--- Root GUI
+local camera = workspace.CurrentCamera
 local drawingUI = Instance.new("ScreenGui")
 drawingUI.ResetOnSpawn = false
 drawingUI.Name = "Drawing"
@@ -11,16 +8,12 @@ drawingUI.IgnoreGuiInset = true
 drawingUI.DisplayOrder = 0x7fffffff
 drawingUI.Parent = coreGui
 
--- Internal storage
+-- variables
 local drawingIndex = 0
-local activeObjects = {} -- stores all live objects
-local updateQueue = {} -- for RenderStepped UI updates
+local uiStrokes = {}
+local activeObjects = {} -- ADDED
 
-local function convertTransparency(transparency)
-	return math.clamp(1 - transparency, 0, 1)
-end
-
-local baseDrawingObj = {
+local baseDrawingObj = setmetatable({
 	Visible = true,
 	ZIndex = 0,
 	Transparency = 1,
@@ -28,33 +21,41 @@ local baseDrawingObj = {
 	Remove = function(self)
 		setmetatable(self, nil)
 	end
-}
+}, {
+	__add = function(t1, t2)
+		local result = table.clone(t1)
 
--- RenderStepped updater
-RunService.RenderStepped:Connect(function()
-	for obj, data in pairs(updateQueue) do
-		if not data.Frame or not activeObjects[obj] then
-			updateQueue[obj] = nil
-		else
-			data.UpdateFunc(data.Frame, data.Cache)
+		for index, value in t2 do
+			result[index] = value
 		end
+		return result
 	end
-end)
-
-local DrawingLib = {}
-DrawingLib.Fonts = {["UI"]=0,["System"]=1,["Flex"]=2,["Monospace"]=3}
+})
 
 local drawingFontsEnum = {
-	[0] = Enum.Font.Roboto,
-	[1] = Enum.Font.Legacy,
-	[2] = Enum.Font.SourceSans,
-	[3] = Enum.Font.RobotoMono
+	[0] = Font.fromEnum(Enum.Font.Roboto),
+	[1] = Font.fromEnum(Enum.Font.Legacy),
+	[2] = Font.fromEnum(Enum.Font.SourceSans),
+	[3] = Font.fromEnum(Enum.Font.RobotoMono),
 }
 
-local function getFontFromIndex(fontIndex)
+local function getFontFromIndex(fontIndex: number): Font
 	return drawingFontsEnum[fontIndex]
 end
 
+local function convertTransparency(transparency: number): number
+	return math.clamp(1 - transparency, 0, 1)
+end
+
+local DrawingLib = {}
+DrawingLib.Fonts = {
+	["UI"] = 0,
+	["System"] = 1,
+	["Flex"] = 2,
+	["Monospace"] = 3
+}
+
+-- ADDED: clear function
 function DrawingLib.cleardrawcache()
 	for obj in pairs(activeObjects) do
 		if obj.Remove then
@@ -62,293 +63,643 @@ function DrawingLib.cleardrawcache()
 		end
 		activeObjects[obj] = nil
 	end
-	updateQueue = {}
 end
 
-local function createBaseObject(props)
-	local obj = {}
-	obj._cache = {}
-	for k,v in pairs(props) do
-		obj._cache[k] = v
-	end
-	setmetatable(obj, {
-		__newindex = function(_, key, value)
-			obj._cache[key] = value
-		end,
-		__index = function(_, key)
-			if key == "Remove" then
-				return function()
-					if obj._frame then obj._frame:Destroy() end
-					activeObjects[obj] = nil
-					updateQueue[obj] = nil
-					return baseDrawingObj.Remove(obj)
-				end
-			elseif key == "__OBJECT_EXISTS" then
-				return activeObjects[obj] == true
-			else
-				return obj._cache[key]
-			end
-		end
-	})
-	return obj
-end
+-- global compatibility
+DrawingLib.cleardrawcache = DrawingLib.cleardrawcache
 
 function DrawingLib.new(drawingType)
 	drawingIndex += 1
 
+	----------------------------------------------------------------
+	-- LINE
+	----------------------------------------------------------------
 	if drawingType == "Line" then
-		local obj = createBaseObject({
+		local lineObj = ({
 			From = Vector2.zero,
 			To = Vector2.zero,
-			Thickness = 1,
-			Visible = true,
-			Color = Color3.new(),
-			ZIndex = 0,
-			Transparency = 1
-		})
+			Thickness = 1
+		} + baseDrawingObj)
 
-		local frame = Instance.new("Frame")
-		frame.Name = tostring(drawingIndex)
-		frame.AnchorPoint = Vector2.new(0.5,0.5)
-		frame.BorderSizePixel = 0
-		frame.Parent = drawingUI
-		obj._frame = frame
+		local lineFrame = Instance.new("Frame")
+		lineFrame.Name = drawingIndex
+		lineFrame.AnchorPoint = (Vector2.one * .5)
+		lineFrame.BorderSizePixel = 0
 
-		local function update(frame, cache)
-			local direction = cache.To - cache.From
-			local center = (cache.To + cache.From) / 2
-			local distance = direction.Magnitude
-			local theta = math.deg(math.atan2(direction.Y, direction.X))
-			frame.Position = UDim2.fromOffset(center.X, center.Y)
-			frame.Rotation = theta
-			frame.Size = UDim2.fromOffset(distance, cache.Thickness)
-			frame.BackgroundColor3 = cache.Color
-			frame.BackgroundTransparency = convertTransparency(cache.Transparency)
-			frame.Visible = cache.Visible
-			frame.ZIndex = cache.ZIndex
-		end
+		lineFrame.BackgroundColor3 = lineObj.Color
+		lineFrame.Visible = lineObj.Visible
+		lineFrame.ZIndex = lineObj.ZIndex
+		lineFrame.BackgroundTransparency = convertTransparency(lineObj.Transparency)
+		lineFrame.Size = UDim2.new()
+		lineFrame.Parent = drawingUI
 
-		updateQueue[obj] = {Frame=frame, Cache=obj._cache, UpdateFunc=update}
-		activeObjects[obj] = true
-		return obj
-	end
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then
+					return
+				end
 
-	if drawingType == "Square" or drawingType == "Circle" then
-		local obj = createBaseObject({
-			Position = Vector2.zero,
-			Size = Vector2.new(100,100),
-			Radius = 50,
-			Thickness = 1,
-			Filled = false,
-			Visible = true,
-			Color = Color3.new(),
-			ZIndex = 0,
-			Transparency = 1
-		})
+				if index == "From" then
+					local direction = (lineObj.To - value)
+					local center = (lineObj.To + value) / 2
+					local distance = direction.Magnitude
+					local theta = math.deg(math.atan2(direction.Y, direction.X))
 
-		local frame = Instance.new("Frame")
-		frame.Name = tostring(drawingIndex)
-		frame.AnchorPoint = Vector2.new(0.5,0.5)
-		frame.BorderSizePixel = 0
-		frame.Parent = drawingUI
-		local corner = Instance.new("UICorner")
-		corner.Parent = frame
-		obj._frame = frame
+					lineFrame.Position = UDim2.fromOffset(center.X, center.Y)
+					lineFrame.Rotation = theta
+					lineFrame.Size = UDim2.fromOffset(distance, lineObj.Thickness)
 
-		local stroke = Instance.new("UIStroke")
-		stroke.Parent = frame
+				elseif index == "To" then
+					local direction = (value - lineObj.From)
+					local center = (value + lineObj.From) / 2
+					local distance = direction.Magnitude
+					local theta = math.deg(math.atan2(direction.Y, direction.X))
 
-		local function update(frame, cache)
-			frame.Position = UDim2.fromOffset(cache.Position.X, cache.Position.Y)
-			if drawingType=="Circle" then
-				frame.Size = UDim2.fromOffset(cache.Radius*2, cache.Radius*2)
-				corner.CornerRadius = UDim.new(1,0)
-			else
-				frame.Size = UDim2.fromOffset(cache.Size.X, cache.Size.Y)
-				corner.CornerRadius = cache.Filled and UDim.new(1,0) or UDim.new(0,0)
+					lineFrame.Position = UDim2.fromOffset(center.X, center.Y)
+					lineFrame.Rotation = theta
+					lineFrame.Size = UDim2.fromOffset(distance, lineObj.Thickness)
+
+				elseif index == "Thickness" then
+					local distance = (lineObj.To - lineObj.From).Magnitude
+					lineFrame.Size = UDim2.fromOffset(distance, value)
+
+				elseif index == "Visible" then
+					lineFrame.Visible = value ~= nil and value or false
+
+				elseif index == "ZIndex" then
+					lineFrame.ZIndex = value
+
+				elseif index == "Transparency" then
+					lineFrame.BackgroundTransparency = convertTransparency(value)
+
+				elseif index == "Color" then
+					lineFrame.BackgroundColor3 = value
+				end
+
+				lineObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						lineFrame:Destroy()
+						activeObjects[self] = nil
+						lineObj.Remove(self)
+						return lineObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				end
+				return lineObj[index]
 			end
-			stroke.Thickness = cache.Thickness
-			stroke.Enabled = not cache.Filled
-			stroke.Color = cache.Color
-			stroke.Transparency = convertTransparency(cache.Transparency)
-			frame.BackgroundColor3 = cache.Color
-			frame.BackgroundTransparency = cache.Filled and convertTransparency(cache.Transparency) or 1
-			frame.Visible = cache.Visible
-			frame.ZIndex = cache.ZIndex
-		end
+		})
 
-		updateQueue[obj] = {Frame=frame, Cache=obj._cache, UpdateFunc=update}
 		activeObjects[obj] = true
 		return obj
 	end
 
+	----------------------------------------------------------------
+	-- TEXT
+	----------------------------------------------------------------
 	if drawingType == "Text" then
-		local obj = createBaseObject({
+		local textObj = ({
 			Text = "",
-			Font = 0,
-			Size = 14,
+			Font = DrawingLib.Fonts.UI,
+			Size = 0,
 			Position = Vector2.zero,
 			Center = false,
 			Outline = false,
-			OutlineColor = Color3.new(),
-			Visible = true,
-			Color = Color3.new(),
-			ZIndex = 0,
-			Transparency = 1
+			OutlineColor = Color3.new()
+		} + baseDrawingObj)
+
+		local textLabel = Instance.new("TextLabel")
+		local uiStroke = Instance.new("UIStroke")
+		textLabel.Name = drawingIndex
+		textLabel.AnchorPoint = (Vector2.one * .5)
+		textLabel.BorderSizePixel = 0
+		textLabel.BackgroundTransparency = 1
+
+		textLabel.Visible = textObj.Visible
+		textLabel.TextColor3 = textObj.Color
+		textLabel.TextTransparency = convertTransparency(textObj.Transparency)
+		textLabel.ZIndex = textObj.ZIndex
+
+		textLabel.FontFace = getFontFromIndex(textObj.Font)
+		textLabel.TextSize = textObj.Size
+
+		textLabel:GetPropertyChangedSignal("TextBounds"):Connect(function()
+			local textBounds = textLabel.TextBounds
+			local offset = textBounds / 2
+			textLabel.Size = UDim2.fromOffset(textBounds.X, textBounds.Y)
+			textLabel.Position = UDim2.fromOffset(textObj.Position.X + (textObj.Center and 0 or offset.X), textObj.Position.Y + offset.Y)
+		end)
+
+		uiStroke.Thickness = 1
+		uiStroke.Enabled = textObj.Outline
+		uiStroke.Color = textObj.Color
+
+		textLabel.Parent = drawingUI
+		uiStroke.Parent = textLabel
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then
+					return
+				end
+
+				if index == "Text" then
+					textLabel.Text = value
+
+				elseif index == "Font" then
+					value = math.clamp(value, 0, 3)
+					textLabel.FontFace = getFontFromIndex(value)
+
+				elseif index == "Size" then
+					textLabel.TextSize = value
+
+				elseif index == "Position" then
+					local offset = textLabel.TextBounds / 2
+					textLabel.Position = UDim2.fromOffset(value.X + (textObj.Center and 0 or offset.X), value.Y + offset.Y)
+
+				elseif index == "Center" then
+					local position = (value and camera.ViewportSize / 2 or textObj.Position)
+					textLabel.Position = UDim2.fromOffset(position.X, position.Y)
+
+				elseif index == "Outline" then
+					uiStroke.Enabled = value
+
+				elseif index == "OutlineColor" then
+					uiStroke.Color = value
+
+				elseif index == "Visible" then
+					textLabel.Visible = value ~= nil and value or false
+
+				elseif index == "ZIndex" then
+					textLabel.ZIndex = value
+
+				elseif index == "Transparency" then
+					local transparency = convertTransparency(value)
+					textLabel.TextTransparency = transparency
+					uiStroke.Transparency = transparency
+
+				elseif index == "Color" then
+					textLabel.TextColor3 = value
+				end
+
+				textObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						textLabel:Destroy()
+						activeObjects[self] = nil
+						textObj.Remove(self)
+						return textObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				elseif index == "TextBounds" then
+					return textLabel.TextBounds
+				end
+				return textObj[index]
+			end
 		})
 
-		local label = Instance.new("TextLabel")
-		label.Name = tostring(drawingIndex)
-		label.AnchorPoint = Vector2.new(0.5,0.5)
-		label.BorderSizePixel = 0
-		label.BackgroundTransparency = 1
-		label.Parent = drawingUI
-		local stroke = Instance.new("UIStroke")
-		stroke.Parent = label
-		obj._frame = label
-
-		local function update(label, cache)
-			label.Text = cache.Text
-			label.FontFace = getFontFromIndex(cache.Font)
-			label.TextSize = cache.Size
-			label.Position = UDim2.fromOffset(cache.Position.X, cache.Position.Y)
-			label.TextColor3 = cache.Color
-			label.TextTransparency = convertTransparency(cache.Transparency)
-			label.Visible = cache.Visible
-			label.ZIndex = cache.ZIndex
-			stroke.Enabled = cache.Outline
-			stroke.Color = cache.OutlineColor
-			stroke.Transparency = convertTransparency(cache.Transparency)
-		end
-
-		updateQueue[obj] = {Frame=label, Cache=obj._cache, UpdateFunc=update}
 		activeObjects[obj] = true
 		return obj
 	end
 
-	if drawingType == "Line" then
-		-- handled above
+	----------------------------------------------------------------
+	-- CIRCLE
+	----------------------------------------------------------------
+	if drawingType == "Circle" then
+		local circleObj = ({
+			Radius = 150,
+			Position = Vector2.zero,
+			Thickness = .7,
+			Filled = false
+		} + baseDrawingObj)
+
+		local circleFrame = Instance.new("Frame")
+		local uiCorner = Instance.new("UICorner")
+		local uiStroke = Instance.new("UIStroke")
+
+		circleFrame.Name = drawingIndex
+		circleFrame.AnchorPoint = (Vector2.one * .5)
+		circleFrame.BorderSizePixel = 0
+		circleFrame.BackgroundTransparency = (circleObj.Filled and convertTransparency(circleObj.Transparency) or 1)
+		circleFrame.BackgroundColor3 = circleObj.Color
+		circleFrame.Visible = circleObj.Visible
+		circleFrame.ZIndex = circleObj.ZIndex
+
+		uiCorner.CornerRadius = UDim.new(1, 0)
+		circleFrame.Size = UDim2.fromOffset(circleObj.Radius * 2, circleObj.Radius * 2)
+
+		uiStroke.Thickness = circleObj.Thickness
+		uiStroke.Enabled = not circleObj.Filled
+		uiStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+		circleFrame.Parent = drawingUI
+		uiCorner.Parent = circleFrame
+		uiStroke.Parent = circleFrame
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then
+					return
+				end
+
+				if index == "Radius" then
+					local radius = value * 2
+					circleFrame.Size = UDim2.fromOffset(radius, radius)
+
+				elseif index == "Position" then
+					circleFrame.Position = UDim2.fromOffset(value.X, value.Y)
+
+				elseif index == "Thickness" then
+					uiStroke.Thickness = math.clamp(value, .6, 0x7fffffff)
+
+				elseif index == "Filled" then
+					circleFrame.BackgroundTransparency = (value and convertTransparency(circleObj.Transparency) or 1)
+					uiStroke.Enabled = not value
+
+				elseif index == "Visible" then
+					circleFrame.Visible = value ~= nil and value or false
+
+				elseif index == "ZIndex" then
+					circleFrame.ZIndex = value
+
+				elseif index == "Transparency" then
+					local transparency = convertTransparency(value)
+					circleFrame.BackgroundTransparency = (circleObj.Filled and transparency or 1)
+					uiStroke.Transparency = transparency
+
+				elseif index == "Color" then
+					circleFrame.BackgroundColor3 = value
+					uiStroke.Color = value
+				end
+
+				circleObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						circleFrame:Destroy()
+						activeObjects[self] = nil
+						circleObj.Remove(self)
+						return circleObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				end
+				return circleObj[index]
+			end
+		})
+
+		activeObjects[obj] = true
+		return obj
 	end
 
+	----------------------------------------------------------------
+	-- SQUARE
+	----------------------------------------------------------------
+	if drawingType == "Square" then
+		local squareObj = ({
+			Size = Vector2.zero,
+			Position = Vector2.zero,
+			Thickness = .7,
+			Filled = false
+		} + baseDrawingObj)
+
+		local squareFrame = Instance.new("Frame")
+		local uiStroke = Instance.new("UIStroke")
+		squareFrame.Name = drawingIndex
+		squareFrame.BorderSizePixel = 0
+
+		squareFrame.BackgroundTransparency = (squareObj.Filled and convertTransparency(squareObj.Transparency) or 1)
+		squareFrame.ZIndex = squareObj.ZIndex
+		squareFrame.BackgroundColor3 = squareObj.Color
+		squareFrame.Visible = squareObj.Visible
+
+		uiStroke.Thickness = squareObj.Thickness
+		uiStroke.Enabled = not squareObj.Filled
+		uiStroke.LineJoinMode = Enum.LineJoinMode.Miter
+
+		squareFrame.Parent = drawingUI
+		uiStroke.Parent = squareFrame
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then return end
+
+				if index == "Size" then
+					squareFrame.Size = UDim2.fromOffset(value.X, value.Y)
+
+				elseif index == "Position" then
+					squareFrame.Position = UDim2.fromOffset(value.X, value.Y)
+
+				elseif index == "Thickness" then
+					uiStroke.Thickness = math.clamp(value, .6, 0x7fffffff)
+
+				elseif index == "Filled" then
+					squareFrame.BackgroundTransparency = (value and convertTransparency(squareObj.Transparency) or 1)
+					uiStroke.Enabled = not value
+
+				elseif index == "Visible" then
+					squareFrame.Visible = value ~= nil and value or false
+
+				elseif index == "ZIndex" then
+					squareFrame.ZIndex = value
+
+				elseif index == "Transparency" then
+					local t = convertTransparency(value)
+					squareFrame.BackgroundTransparency = (squareObj.Filled and t or 1)
+					uiStroke.Transparency = t
+
+				elseif index == "Color" then
+					uiStroke.Color = value
+					squareFrame.BackgroundColor3 = value
+				end
+
+				squareObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						squareFrame:Destroy()
+						activeObjects[self] = nil
+						squareObj.Remove(self)
+						return squareObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				end
+				return squareObj[index]
+			end
+		})
+
+		activeObjects[obj] = true
+		return obj
+	end
+
+	----------------------------------------------------------------
+	-- IMAGE
+	----------------------------------------------------------------
 	if drawingType == "Image" then
-		local obj = createBaseObject({
+		local imageObj = ({
 			Data = "",
 			DataURL = "rbxassetid://0",
-			Position = Vector2.zero,
 			Size = Vector2.zero,
-			Visible = true,
-			ZIndex = 0,
-			Color = Color3.new(),
-			Transparency = 1
+			Position = Vector2.zero
+		} + baseDrawingObj)
+
+		local imageFrame = Instance.new("ImageLabel")
+		imageFrame.Name = drawingIndex
+		imageFrame.BorderSizePixel = 0
+		imageFrame.ScaleType = Enum.ScaleType.Stretch
+		imageFrame.BackgroundTransparency = 1
+
+		imageFrame.Visible = imageObj.Visible
+		imageFrame.ZIndex = imageObj.ZIndex
+		imageFrame.ImageTransparency = convertTransparency(imageObj.Transparency)
+		imageFrame.ImageColor3 = imageObj.Color
+		imageFrame.Parent = drawingUI
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then return end
+
+				if index == "Data" then
+					-- intentionally unimplemented
+
+				elseif index == "DataURL" then
+					imageFrame.Image = value
+
+				elseif index == "Size" then
+					imageFrame.Size = UDim2.fromOffset(value.X, value.Y)
+
+				elseif index == "Position" then
+					imageFrame.Position = UDim2.fromOffset(value.X, value.Y)
+
+				elseif index == "Visible" then
+					imageFrame.Visible = value ~= nil and value or false
+
+				elseif index == "ZIndex" then
+					imageFrame.ZIndex = value
+
+				elseif index == "Transparency" then
+					imageFrame.ImageTransparency = convertTransparency(value)
+
+				elseif index == "Color" then
+					imageFrame.ImageColor3 = value
+				end
+
+				imageObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						imageFrame:Destroy()
+						activeObjects[self] = nil
+						imageObj.Remove(self)
+						return imageObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				elseif index == "Data" then
+					return nil -- unchanged
+				end
+				return imageObj[index]
+			end
 		})
 
-		local image = Instance.new("ImageLabel")
-		image.Name = tostring(drawingIndex)
-		image.BackgroundTransparency = 1
-		image.BorderSizePixel = 0
-		image.Parent = drawingUI
-		obj._frame = image
-
-		local function update(img, cache)
-			img.Position = UDim2.fromOffset(cache.Position.X, cache.Position.Y)
-			img.Size = UDim2.fromOffset(cache.Size.X, cache.Size.Y)
-			img.Image = cache.DataURL
-			img.ImageColor3 = cache.Color
-			img.ImageTransparency = convertTransparency(cache.Transparency)
-			img.Visible = cache.Visible
-			img.ZIndex = cache.ZIndex
-		end
-
-		updateQueue[obj] = {Frame=image, Cache=obj._cache, UpdateFunc=update}
 		activeObjects[obj] = true
 		return obj
 	end
 
-	-- For Quad/Triangle, just use multiple lines
+	----------------------------------------------------------------
+	-- QUAD
+	----------------------------------------------------------------
 	if drawingType == "Quad" then
-		local obj = createBaseObject({
+		local quadObj = ({
 			PointA = Vector2.zero,
 			PointB = Vector2.zero,
 			PointC = Vector2.zero,
-			PointD = Vector2.zero,
+			PointD = Vector3.zero,
 			Thickness = 1,
-			Filled = false,
-			Visible = true,
-			Color = Color3.new(),
-			ZIndex = 0,
-			Transparency = 1
+			Filled = false
+		} + baseDrawingObj)
+
+		local _linePoints = {}
+		_linePoints.A = DrawingLib.new("Line")
+		_linePoints.B = DrawingLib.new("Line")
+		_linePoints.C = DrawingLib.new("Line")
+		_linePoints.D = DrawingLib.new("Line")
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then return end
+
+				if index == "PointA" then
+					_linePoints.A.From = value
+					_linePoints.B.To = value
+
+				elseif index == "PointB" then
+					_linePoints.B.From = value
+					_linePoints.C.To = value
+
+				elseif index == "PointC" then
+					_linePoints.C.From = value
+					_linePoints.D.To = value
+
+				elseif index == "PointD" then
+					_linePoints.D.From = value
+					_linePoints.A.To = value
+
+				elseif index == "Thickness" or index == "Visible" or index == "Color" or index == "ZIndex" then
+					value = value ~= nil and value or false
+					for _, line in _linePoints do
+						line[index] = value
+					end
+
+				elseif index == "Filled" then
+					-- unimplemented
+				end
+
+				quadObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						for _, line in _linePoints do
+							line:Remove()
+						end
+						activeObjects[self] = nil
+						quadObj.Remove(self)
+						return quadObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				end
+				return quadObj[index]
+			end
 		})
 
-		obj._lines = {
-			A = DrawingLib.new("Line"),
-			B = DrawingLib.new("Line"),
-			C = DrawingLib.new("Line"),
-			D = DrawingLib.new("Line")
-		}
-
-		local function update(_, cache)
-			obj._lines.A.From = cache.PointA; obj._lines.A.To = cache.PointB
-			obj._lines.B.From = cache.PointB; obj._lines.B.To = cache.PointC
-			obj._lines.C.From = cache.PointC; obj._lines.C.To = cache.PointD
-			obj._lines.D.From = cache.PointD; obj._lines.D.To = cache.PointA
-			for _, l in pairs(obj._lines) do
-				l.Thickness = cache.Thickness
-				l.Color = cache.Color
-				l.Visible = cache.Visible
-			end
-		end
-
-		updateQueue[obj] = {Frame=nil, Cache=obj._cache, UpdateFunc=update}
 		activeObjects[obj] = true
 		return obj
 	end
 
+	----------------------------------------------------------------
+	-- TRIANGLE
+	----------------------------------------------------------------
 	if drawingType == "Triangle" then
-		local obj = createBaseObject({
+		local triangleObj = ({
 			PointA = Vector2.zero,
 			PointB = Vector2.zero,
 			PointC = Vector2.zero,
 			Thickness = 1,
-			Filled = false,
-			Visible = true,
-			Color = Color3.new(),
-			ZIndex = 0,
-			Transparency = 1
+			Filled = false
+		} + baseDrawingObj)
+
+		local _linePoints = {}
+		_linePoints.A = DrawingLib.new("Line")
+		_linePoints.B = DrawingLib.new("Line")
+		_linePoints.C = DrawingLib.new("Line")
+
+		local obj = setmetatable({}, {
+			__newindex = function(_, index, value)
+				if index ~= "Visible" and value == nil then return end
+
+				if index == "PointA" then
+					_linePoints.A.From = value
+					_linePoints.B.To = value
+
+				elseif index == "PointB" then
+					_linePoints.B.From = value
+					_linePoints.C.To = value
+
+				elseif index == "PointC" then
+					_linePoints.C.From = value
+					_linePoints.A.To = value
+
+				elseif index == "Thickness" or index == "Visible" or index == "Color" or index == "ZIndex" then
+					value = value ~= nil and value or false
+					for _, line in _linePoints do
+						line[index] = value
+					end
+
+				elseif index == "Filled" then
+					-- not implemented
+				end
+
+				triangleObj[index] = value
+			end,
+
+			__index = function(self, index)
+				if index == "Remove" then
+					return function()
+						for _, line in _linePoints do
+							line:Remove()
+						end
+						activeObjects[self] = nil
+						triangleObj.Remove(self)
+						return triangleObj:Remove()
+					end
+				elseif index == "__OBJECT_EXISTS" then
+					local got = activeObjects[self] ~= nil
+					if got == nil then return false end
+					return true
+				end
+				return triangleObj[index]
+			end
 		})
 
-		obj._lines = {
-			A = DrawingLib.new("Line"),
-			B = DrawingLib.new("Line"),
-			C = DrawingLib.new("Line")
-		}
-
-		local function update(_, cache)
-			obj._lines.A.From = cache.PointA; obj._lines.A.To = cache.PointB
-			obj._lines.B.From = cache.PointB; obj._lines.B.To = cache.PointC
-			obj._lines.C.From = cache.PointC; obj._lines.C.To = cache.PointA
-			for _, l in pairs(obj._lines) do
-				l.Thickness = cache.Thickness
-				l.Color = cache.Color
-				l.Visible = cache.Visible
-			end
-		end
-
-		updateQueue[obj] = {Frame=nil, Cache=obj._cache, UpdateFunc=update}
 		activeObjects[obj] = true
 		return obj
 	end
 end
 
+----------------------------------------------------------------
+----------------------------------------------------------------
+-- NEW FUNCTIONS ADDED HERE
+----------------------------------------------------------------
+----------------------------------------------------------------
+
+-- isrenderobj(object)
 function DrawingLib.isrenderobj(obj)
 	return activeObjects[obj] == true
 end
 
+-- getrenderproperty(object, key)
 function DrawingLib.getrenderproperty(obj, key)
-	return obj._cache[key]
+	if not activeObjects[obj] then
+		return nil
+	end
+	return obj[key]
 end
 
+-- setrenderproperty(object, key, value)
 function DrawingLib.setrenderproperty(obj, key, value)
-	obj[key] = value
+	if activeObjects[obj] then
+		obj[key] = value
+	end
 end
 
 return DrawingLib
