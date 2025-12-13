@@ -1,6 +1,6 @@
 --// Safe Full Drawing Library (ALL TYPES PATCHED)
 
-local CoreGui = game:GetService("CoreGui")
+local CoreGui = game.Players.LocalPlayer.PlayerGui
 local Camera = workspace.CurrentCamera
 
 -------------------------------------------------------
@@ -199,111 +199,75 @@ function Drawing.new(typeName)
 	---------------------------------------------------
 	-- TEXT
 	---------------------------------------------------
-	if typeName=="Text" then
-		local state=createBaseState()
-		state.Text=""
-		state.Size=14
-		state.Position=Vector2.zero
-		state.Center=false
+	
 
-		local label=Instance.new("TextLabel")
-		label.BackgroundTransparency=1
-		label.TextXAlignment=Enum.TextXAlignment.Left
-		label.TextYAlignment=Enum.TextYAlignment.Top
-		label.Parent=DrawingUI
+---------------------------------------------------
+-- IMAGE
+---------------------------------------------------
+if typeName=="Image" then
+	local state=createBaseState()
+	state.DataURL="rbxassetid://0"
+	state.Size=Vector2.zero
+	state.Position=Vector2.zero
 
-		local obj={}
-		activeObjects[obj]=true
+	local img=Instance.new("ImageLabel")
+	img.BackgroundTransparency=1
+	img.Parent=DrawingUI
 
-		setmetatable(obj,{
-			__index=function(_,k)
-				if k=="Remove" then return function() kill(obj,state,label) end
-				elseif k=="__OBJECT_EXISTS" then return not state.__dead end
-				elseif k=="TextBounds" then return label.TextBounds end
-				return state[k]
-			end,
-			__newindex=function(_,k,v)
-				if state.__dead then return end
-				if k=="Text" then label.Text=v
-				elseif k=="Size" then label.TextSize=v
-				elseif k=="Position" then label.Position=UDim2.fromOffset(v.X,v.Y)
-				elseif k=="Color" then label.TextColor3=v
-				elseif k=="Transparency" then label.TextTransparency=convertTransparency(v)
-				elseif k=="Visible" then label.Visible=v
-				elseif k=="ZIndex" then label.ZIndex=v end
-				state[k]=v
-			end
-		})
-		return obj
-	end
+	local obj={}
+	activeObjects[obj]=true
 
-	---------------------------------------------------
-	-- IMAGE
-	---------------------------------------------------
-	if typeName=="Image" then
-		local state=createBaseState()
-		state.DataURL="rbxassetid://0"
-		state.Size=Vector2.zero
-		state.Position=Vector2.zero
+	setmetatable(obj,{
+		__index=function(_,k)
+			if k=="Remove" then return function() kill(obj,state,img) end
+			elseif k=="__OBJECT_EXISTS" then return not state.__dead end
+			return state[k]
+		end,
+		__newindex=function(_,k,v)
+			if state.__dead then return end
+			if k=="DataURL" then img.Image=v
+			elseif k=="Size" then img.Size=UDim2.fromOffset(v.X,v.Y)
+			elseif k=="Position" then img.Position=UDim2.fromOffset(v.X,v.Y)
+			elseif k=="Color" then img.ImageColor3=v
+			elseif k=="Transparency" then img.ImageTransparency=convertTransparency(v)
+			elseif k=="Visible" then img.Visible=v
+			elseif k=="ZIndex" then img.ZIndex=v end
+			state[k]=v
+		end
+	})
+	return obj
+end
 
-		local img=Instance.new("ImageLabel")
-		img.BackgroundTransparency=1
-		img.Parent=DrawingUI
+---------------------------------------------------
+-- TRIANGLE / QUAD (LINES)
+---------------------------------------------------
+if typeName=="Triangle" or typeName=="Quad" then
+	local points = {}
+	local count = typeName=="Triangle" and 3 or 4
+	for i=1,count do points[i]=Drawing.new("Line") end
 
-		local obj={}
-		activeObjects[obj]=true
+	local obj={}
+	activeObjects[obj]=true
 
-		setmetatable(obj,{
-			__index=function(_,k)
-				if k=="Remove" then return function() kill(obj,state,img) end
-				elseif k=="__OBJECT_EXISTS" then return not state.__dead end
-				return state[k]
-			end,
-			__newindex=function(_,k,v)
-				if state.__dead then return end
-				if k=="DataURL" then img.Image=v
-				elseif k=="Size" then img.Size=UDim2.fromOffset(v.X,v.Y)
-				elseif k=="Position" then img.Position=UDim2.fromOffset(v.X,v.Y)
-				elseif k=="Color" then img.ImageColor3=v
-				elseif k=="Transparency" then img.ImageTransparency=convertTransparency(v)
-				elseif k=="Visible" then img.Visible=v
-				elseif k=="ZIndex" then img.ZIndex=v end
-				state[k]=v
-			end
-		})
-		return obj
-	end
-
-	---------------------------------------------------
-	-- TRIANGLE / QUAD (LINES)
-	---------------------------------------------------
-	if typeName=="Triangle" or typeName=="Quad" then
-		local points = {}
-		local count = typeName=="Triangle" and 3 or 4
-		for i=1,count do points[i]=Drawing.new("Line") end
-
-		local obj={}
-		activeObjects[obj]=true
-
-		setmetatable(obj,{
-			__index=function(_,k)
-				if k=="Remove" then
-					return function()
-						for _,l in ipairs(points) do l:Remove() end
-						activeObjects[obj]=nil
-					end
-				elseif k=="__OBJECT_EXISTS" then return activeObjects[obj]~=nil end
-			end,
-			__newindex=function(_,k,v)
-				if k=="Color" or k=="Thickness" or k=="Visible" then
-					for _,l in ipairs(points) do l[k]=v end
+	setmetatable(obj,{
+		__index=function(_,k)
+			if k=="Remove" then
+				return function()
+					for _,l in ipairs(points) do l:Remove() end
+					activeObjects[obj]=nil
 				end
+			elseif k=="__OBJECT_EXISTS" then return activeObjects[obj]~=nil end
+		end,
+		__newindex=function(_,k,v)
+			if k=="Color" or k=="Thickness" or k=="Visible" then
+				for _,l in ipairs(points) do l[k]=v end
 			end
-		})
-		return obj
-	end
+		end
+	})
+	return obj
+end
 
-	error("Unsupported type: "..tostring(typeName))
+error("Unsupported type: "..tostring(typeName))
 end
 
 -------------------------------------------------------
